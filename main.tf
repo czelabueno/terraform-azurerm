@@ -104,16 +104,35 @@ resource "azurerm_log_analytics_workspace_linked_service" "key_vault_logan" {
 # * Storage Account
 
 # Next Resource is a CDN
+resource "azurerm_storage_account" "stor" {
+  name                     = "storaccts"
+  location                 = "${azurerm_resource_group.tf_azure_provisioning.location}"
+  resource_group_name      = "${azurerm_resource_group.tf_azure_provisioning.name}"
+  account_tier             = "${var.storage_account_tier}"
+  account_replication_type = "${var.storage_replication_type}"
+}
+
 resource "azurerm_cdn_profile" "cdn" {
-  name                = "${var.prefix}cdn"
+  name                = "${var.prefix}-cdn"
   location            = "${azurerm_resource_group.tf_azure_provisioning.location}"
   resource_group_name = "${azurerm_resource_group.tf_azure_provisioning.name}"
-  sku                 = "Standard_Verizon"
+  sku                 = "Standard_Akamai"
+}
 
-  tags = {
-    createdBy = "Terraform"
+resource "azurerm_cdn_endpoint" "cdn" {
+  name                = "${var.prefix}-cdn"
+  profile_name        = "${azurerm_cdn_profile.cdn.name}"
+  location            = "${azurerm_resource_group.tf_azure_provisioning.location}"
+  resource_group_name = "${azurerm_resource_group.tf_azure_provisioning.name}"
+
+  origin {
+    name       = "${var.prefix}origin1"
+    host_name  = "www.example.com"
+    http_port  = 80
+    https_port = 443
   }
 }
+
 # Next Resource is a Service Plan for webapp
 resource "azurerm_app_service_plan" "service_plan" {
   name                = "${var.prefix}service-plan"
@@ -145,18 +164,7 @@ resource "azurerm_app_service" "webapp" {
     createdBy = "Terraform"
   }
 }
-# Next resource is Storage Account
-resource "azurerm_storage_account" "storage_account" {
-  name                     = "${var.prefix}staccs"
-  resource_group_name      = "${azurerm_resource_group.tf_azure_provisioning.name}"
-  location                 = "${azurerm_resource_group.tf_azure_provisioning.location}"
-  account_tier             = "${var.storage_account_tier}"
-  account_replication_type = "${var.storage_replication_type}"
 
-  tags = {
-    createdBy = "Terraform"
-  }
-}
 
 ##############################################################################
 # * Backend layer resources
@@ -216,11 +224,8 @@ resource "azurerm_kubernetes_cluster" "k8s" {
         log_analytics_workspace_id = "${azurerm_log_analytics_workspace.log_analytics.id}"
         }
     }
-
-    tags {
-        createdBy = "Terraform"
-    }
 }
+
 # Next resource Redis Cache
 resource "azurerm_redis_cache" "redis" {
   name                = "${var.prefix}redis"
